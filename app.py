@@ -7,6 +7,7 @@ import numpy as np
 import math
 from PIL import Image
 import time
+import threading
 
 # Page configuration
 st.set_page_config(
@@ -54,6 +55,13 @@ st.markdown("""
         border-left: 4px solid #28a745;
         margin: 1rem 0;
     }
+    .warning-box {
+        background-color: #fff3cd;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #ffc107;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,9 +82,31 @@ KEYPOINT_CONNECTIONS = [(0, 1), (1, 2)]
 st.markdown('<h1 class="main-header">Pose Detection & Classification</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Analyze posture with AI-powered pose detection using YOLO v8</p>', unsafe_allow_html=True)
 
+# Check if running locally
+def is_running_locally():
+    """Check if the app is running on localhost"""
+    import streamlit.web.server.server as streamlit_server
+    try:
+        # Try to get the server instance
+        server = streamlit_server.Server.get_current()
+        if server:
+            return 'localhost' in str(server._host) or '127.0.0.1' in str(server._host)
+    except:
+        pass
+    return False
+
+# Detect environment
+IS_LOCAL = is_running_locally()
+
 # Sidebar Configuration
 with st.sidebar:
     st.header("Configuration")
+    
+    # Environment info
+    if IS_LOCAL:
+        st.success("🟢 Running locally - Webcam available")
+    else:
+        st.warning("🟡 Running on cloud - Webcam not available")
     
     # Model settings
     st.subheader("Detection Settings")
@@ -328,6 +358,13 @@ def process_video(video_path):
         accuracy = (good_posture_count / (good_posture_count + bad_posture_count)) * 100 if (good_posture_count + bad_posture_count) > 0 else 0
         st.metric("Good Posture %", f"{accuracy:.1f}%")
 
+def check_webcam_availability():
+    """Check if webcam is available"""
+    cap = cv2.VideoCapture(0)
+    is_available = cap.isOpened()
+    cap.release()
+    return is_available
+
 # Main Interface
 st.markdown("---")
 
@@ -396,56 +433,108 @@ with tab1:
 with tab2:
     st.subheader("Real-time Webcam Pose Detection")
     
-    col1, col2 = st.columns([1, 3])
-    
-    with col1:
-        st.markdown("**Controls**")
-        run_webcam = st.checkbox("Start Webcam")
+    # Check environment and webcam availability
+    if not IS_LOCAL:
+        st.markdown("""
+        <div class="warning-box">
+            <strong>⚠️ Webcam Not Available in Cloud Deployment</strong><br><br>
+            Webcam functionality only works when running the application locally due to browser security restrictions.<br><br>
+            <strong>To use webcam:</strong><br>
+            1. Clone the repository: <code>git clone https://github.com/tayyy03/duduk.git</code><br>
+            2. Install dependencies: <code>pip install -r requirements.txt</code><br>
+            3. Run locally: <code>streamlit run app.py</code><br>
+            4. Open in browser: <code>http://localhost:8501</code>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if run_webcam:
-            st.markdown('<div class="success-box"><strong>Webcam Active</strong><br>Uncheck to stop</div>', unsafe_allow_html=True)
+        # Show demo placeholder
+        demo_img = np.zeros((400, 600, 3), dtype=np.uint8)
+        cv2.putText(demo_img, "Webcam Demo", (150, 180), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 3)
+        cv2.putText(demo_img, "Run locally to enable", (120, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (128, 128, 128), 2)
+        st.image(demo_img, channels="BGR", caption="Webcam placeholder - Available only in local development")
         
-        # Real-time statistics placeholders
-        if run_webcam:
-            st.markdown("**Real-time Stats**")
-            fps_placeholder = st.empty()
-            detection_placeholder = st.empty()
+    else:
+        # Local environment - full webcam functionality
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            st.markdown("**Controls**")
             
-    with col2:
-        webcam_placeholder = st.empty()
-        
-        if run_webcam:
-            cap = cv2.VideoCapture(0)
+            # Check webcam availability
+            webcam_available = check_webcam_availability()
             
-            if not cap.isOpened():
-                st.error("Cannot access webcam. Please check if it's connected and not being used by another application.")
-            else:
-                frame_count = 0
-                start_time = time.time()
+            if webcam_available:
+                run_webcam = st.checkbox("Start Webcam")
                 
-                while run_webcam:
-                    ret, frame = cap.read()
-                    if not ret:
-                        st.error("Failed to read from webcam")
-                        break
-                    
-                    processed_frame, detection_count, pose_results = process_frame(frame)
-                    
-                    # Convert to RGB for display
-                    frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
-                    webcam_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
-                    
-                    # Update stats
-                    frame_count += 1
-                    elapsed_time = time.time() - start_time
-                    current_fps = frame_count / elapsed_time if elapsed_time > 0 else 0
-                    
-                    fps_placeholder.metric("FPS", f"{current_fps:.1f}")
-                    detection_placeholder.metric("Detections", detection_count)
-                    
-                    time.sleep(0.01)
+                if run_webcam:
+                    st.markdown('<div class="success-box"><strong>Webcam Active</strong><br>Uncheck to stop</div>', unsafe_allow_html=True)
+                
+                # Real-time statistics placeholders
+                if run_webcam:
+                    st.markdown("**Real-time Stats**")
+                    fps_placeholder = st.empty()
+                    detection_placeholder = st.empty()
+            else:
+                run_webcam = False
+                st.error("Webcam not detected. Please check if your camera is connected and not being used by another application.")
+                
+        with col2:
+            webcam_placeholder = st.empty()
             
-            cap.release()
+            if webcam_available and run_webcam:
+                # Initialize session state for webcam control
+                if 'webcam_running' not in st.session_state:
+                    st.session_state.webcam_running = False
+                
+                # Start webcam processing
+                cap = cv2.VideoCapture(0)
+                
+                if cap.isOpened():
+                    # Set camera properties for better performance
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    cap.set(cv2.CAP_PROP_FPS, 30)
+                    
+                    frame_count = 0
+                    start_time = time.time()
+                    
+                    # Webcam loop with proper control
+                    while run_webcam:
+                        ret, frame = cap.read()
+                        if not ret:
+                            st.error("Failed to read from webcam")
+                            break
+                        
+                        # Process frame
+                        processed_frame, detection_count, pose_results = process_frame(frame)
+                        
+                        # Convert to RGB for display
+                        frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+                        webcam_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+                        
+                        # Update stats
+                        frame_count += 1
+                        elapsed_time = time.time() - start_time
+                        current_fps = frame_count / elapsed_time if elapsed_time > 0 else 0
+                        
+                        fps_placeholder.metric("FPS", f"{current_fps:.1f}")
+                        detection_placeholder.metric("Detections", detection_count)
+                        
+                        # Small delay to prevent overwhelming
+                        time.sleep(0.03)  # ~30 FPS
+                        
+                        # Check if user stopped webcam
+                        if not run_webcam:
+                            break
+                
+                cap.release()
+            
+            elif not webcam_available:
+                # Show error state
+                error_img = np.zeros((400, 600, 3), dtype=np.uint8)
+                cv2.putText(error_img, "No Webcam Detected", (120, 180), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+                cv2.putText(error_img, "Check camera connection", (140, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (128, 128, 128), 2)
+                webcam_placeholder.image(error_img, channels="BGR")
 
 # Tab 3: Video Upload
 with tab3:
