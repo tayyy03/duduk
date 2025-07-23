@@ -1,17 +1,8 @@
-# Force specific NumPy version (must be first)
-numpy==1.24.3
-
-# Core Streamlit
-streamlit==1.28.0
-
-# ONLY opencv-python-headless (remove all other OpenCV versions)
-opencv-python-headless==4.8.1.78
-
-# ML packages with compatible versions
-ultralytics==8.0.196
-torch==2.0.1
-torchvision==0.15.2
-
-# Essential packages
-pillow==10.0.1
-matplotlib==3.8.0
+# Python 3.13 compatible versions
+streamlit
+numpy
+opencv-python-headless
+ultralytics
+torch
+torchvision
+pillow
