@@ -1,32 +1,17 @@
-# Force NumPy 1.x installation FIRST
+# Force specific NumPy version (must be first)
 numpy==1.24.3
 
-# Install Streamlit without automatic NumPy upgrade
-streamlit==1.28.0 --no-deps
+# Core Streamlit
+streamlit==1.28.0
 
-# OpenCV with exact compatible version
+# ONLY opencv-python-headless (remove all other OpenCV versions)
 opencv-python-headless==4.8.1.78
 
-# Manual Streamlit dependencies with controlled NumPy
-altair>=4.0.0,<6
-blinker>=1.0.0
-cachetools>=4.0
-click>=7.0
-importlib-metadata>=1.4
-pillow>=7.1.0
-protobuf>=3.20,<5
-pyarrow>=6.0
-python-dateutil
-requests>=2.18
-rich>=10.14.0
-tenacity>=8.1.0,<9
-toml
-tornado>=6.0.3
-typing-extensions>=4.3.0
-tzlocal>=1.1
-validators>=0.2
-
-# ML packages with NumPy compatibility
+# ML packages with compatible versions
 ultralytics==8.0.196
 torch==2.0.1
 torchvision==0.15.2
+
+# Essential packages
+pillow==10.0.1
+matplotlib==3.8.0
